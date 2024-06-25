@@ -12,6 +12,8 @@ void init_ring(struct io_uring* ring) {
 	| IORING_SETUP_COOP_TASKRUN 
 	| IORING_SETUP_CQSIZE    
     });
+
+
 }
 
 typedef struct {
@@ -29,7 +31,7 @@ buffer_pool_t init_buffer_pool(size_t buf_size, size_t num_buffers) {
     // TODO check for error
     void* buffers = metadata + sizeof(struct io_uring_buf) * num_buffers;
 
-    return (buffer_pool_t){mmap_size, num_buffers, buf_size, metadata, buffers};
+    return (buffer_pool_t){num_buffers, buf_size, mmap_size, metadata, buffers};
 }
 
 void register_buffer_pool(struct io_uring* ring, buffer_pool_t* pool) {
