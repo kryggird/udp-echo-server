@@ -52,8 +52,7 @@ void register_buffer_pool(struct io_uring* ring, buffer_pool_t* pool) {
     io_uring_buf_ring_advance(pool->metadata, pool->num_buffers);
 }
 
-static prep_recv_multishot(struct io_uring* ring, struct msghdr* msg)
-{
+int prep_recv_multishot(struct io_uring* ring, struct msghdr* msg) {
 	struct io_uring_sqe* sqe = io_uring_get_sqe(ring);
 
 	io_uring_prep_recvmsg_multishot(

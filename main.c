@@ -5,7 +5,9 @@
 // #include <unistd.h>
 
 #include <sys/stat.h>
+#include <sys/socket.h> // CONTROLLEN
 
+#include "liburing.h"
 #include "socket_helper.h"
 #include "ring_helper.h"
 
@@ -19,8 +21,13 @@ void run_server() {
 
     struct io_uring ring;
     init_ring(&ring);
+    io_uring_register_files(&ring, &fd, 1);
     register_buffer_pool(&ring, &pool);
 
+    struct msghdr msg = (struct msghdr){
+	.msg_namelen = sizeof(struct sockaddr_storage), // TODO Why not 0?
+	.msg_controllen = 0
+    };
     prep_recv_multishot(&ring, &msg);
 }
 
