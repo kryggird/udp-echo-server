@@ -1,27 +1,33 @@
 #define _GNU_SOURCE
 
 #include <pthread.h> // pthread_create, pthread_join
-#include <sched.h> // sched_setaffinity, CPU_SETSIZE, CPU_ZERO, CPU_SET
+#include <sched.h> // sched_setaffinity, CPU_SETSIZE, CPU_ZERO, CPU_SET, sched_getaffinity
 #include <stddef.h> // NULL
 #include <stdio.h> // perror
 #include <unistd.h>
-
 #include "server-helper.h" // run_server
-
-#define SYS_NCPUS 1024
 
 typedef struct {
     int thread_id;
     struct parameters* params;
 } thread_args;
 
+int count_cpus(cpu_set_t* cpu_mask) {
+    int num_cpus = 0;
+    for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
+        if (CPU_ISSET(i, cpu_mask)) {
+            num_cpus++;
+        }
+    }
+    return num_cpus;
+}
+
 void* run_one(void* arg) {
     thread_args* args = (thread_args*) arg;
     cpu_set_t cpu_set;
 
     CPU_ZERO(&cpu_set);
-    CPU_SET(args->thread_id % SYS_NCPUS, &cpu_set);
-    // `sched_setaffinity`: If pid is zero, then the calling thread is used.  
+    CPU_SET(args->thread_id, &cpu_set);
     if (sched_setaffinity(0, sizeof(cpu_set), &cpu_set)!= 0) {
         perror("sched_setaffinity");
         return NULL;
@@ -32,22 +38,36 @@ void* run_one(void* arg) {
 }
 
 void run_many(struct parameters* params) {
-    int num_cpus = sysconf(_SC_NPROCESSORS_ONLN);
-    pthread_t threads[num_cpus];
-    thread_args args[num_cpus];
+    cpu_set_t cpu_mask;
+    int num_active_cpus;
 
-    for (int i = 0; i < num_cpus; i++) {
-        args[i] = (thread_args){
-         .thread_id = i,
-         .params = params
-        };
-        if (pthread_create(&threads[i], NULL, run_one, &args[i])!= 0) {
-            perror("pthread_create");
-            return;
+    if (sched_getaffinity(0, sizeof(cpu_mask), &cpu_mask)!= 0) {
+        perror("sched_getaffinity");
+        return;
+    }
+
+    num_active_cpus = count_cpus(&cpu_mask);
+
+    pthread_t threads[num_active_cpus];
+    thread_args args[num_active_cpus];
+    int thread_idx = 0;
+
+    for (int cpu_idx = 0; cpu_idx < sysconf(_SC_NPROCESSORS_ONLN); cpu_idx++) {
+        if (CPU_ISSET(cpu_idx, &cpu_mask)) {
+            args[thread_idx] = (thread_args){
+          .thread_id = cpu_idx,
+          .params = params
+            };
+            if (pthread_create(&threads[thread_idx], NULL, run_one, &args[thread_idx])!= 0) {
+                perror("pthread_create");
+                return;
+            }
+            thread_idx++;
         }
     }
 
-    for (int i = 0; i < num_cpus; i++) {
-        pthread_join(threads[i], NULL);
+    for (int thread_idx = 0; thread_idx < num_active_cpus; thread_idx++) {
+        pthread_join(threads[thread_idx], NULL);
     }
 }
+
