@@ -37,7 +37,7 @@ void run_server(void) {
 	.msg_controllen = 0
     };
     prep_recv_multishot(&ring, &msg);
-    io_uring_submit_and_wait(&ring, 1);
+    io_uring_submit(&ring);
     
     for (;;) {
 	int ret = io_uring_submit_and_wait(&ring, 1);
@@ -45,6 +45,16 @@ void run_server(void) {
 	if (ret < 0) { break; }
 
 	size_t new_cqe_count = io_uring_peek_batch_cqe(&ring, cqe_slots, NUM_CQE_SLOTS);
+
+	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
+	    op_metadata_t op_meta = { .as_u64 = cqe_slots[cqe_idx]->user_data };
+	    int must_rearm = !(cqe_slots[cqe_idx]->flags & IORING_CQE_F_MORE);
+	    if (op_meta.is_recvmsg && must_rearm) {
+		prep_recv_multishot(&ring, &msg);
+		io_uring_submit(&ring);
+		break;
+	    }
+	}
 
 	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
 	    // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
