@@ -22,6 +22,7 @@ void run_server() {
     
     buffer_pool_t pool = init_buffer_pool(BUFFER_SIZE, NUM_BUFFERS);
     struct io_uring_cqe* cqe_slots[NUM_CQE_SLOTS];
+    sendmsg_metadata_t sendmsg_slots[NUM_CQE_SLOTS];
 
     struct io_uring ring;
     init_ring(&ring, IO_QUEUE_DEPTH);
@@ -52,7 +53,7 @@ void run_server() {
 		recvmsg_result_t res = validate_recvmsg(cqe_slots[cqe_idx], &pool, &msg);
 
 		if (res.is_valid) {
-		    prep_sendmsg(&ring, NULL, &res);
+		    prep_sendmsg(&ring, sendmsg_slots, &res);
 		}
 
 	    } else {
