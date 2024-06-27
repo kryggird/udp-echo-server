@@ -18,6 +18,7 @@ const size_t NUM_BUFFERS = 1024;
 const int IO_QUEUE_DEPTH = 64;
 const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
 
+#include <stdio.h>
 
 void run_server(void) {
     int fd = init_socket_v6(8080);
@@ -36,7 +37,6 @@ void run_server(void) {
 	.msg_controllen = 0
     };
     prep_recv_multishot(&ring, &msg);
-
     io_uring_submit_and_wait(&ring, 1);
     
     for (;;) {
@@ -45,6 +45,8 @@ void run_server(void) {
 	if (ret < 0) { break; }
 
 	size_t new_cqe_count = io_uring_peek_batch_cqe(&ring, cqe_slots, NUM_CQE_SLOTS);
+
+	printf("CQE count: %zu\n", new_cqe_count);
 
 	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
 	    // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
@@ -63,7 +65,8 @@ void run_server(void) {
 		io_uring_buf_ring_advance(pool.metadata, 1);
 	    }
 
-	    io_uring_cq_advance(&ring, new_cqe_count);
 	}
+	
+	io_uring_cq_advance(&ring, new_cqe_count);
     }
 }
