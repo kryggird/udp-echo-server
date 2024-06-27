@@ -1,3 +1,5 @@
+#pragma once
+
 #include <sys/mman.h> // mmap
 
 #include "liburing.h"

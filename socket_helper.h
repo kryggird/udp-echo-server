@@ -1,3 +1,5 @@
+#pragma once
+
 #include <sys/socket.h> // socket, bind, AF_INET, SOCK_DGRAM
 #include <netinet/in.h> // sockaddr_in, htons, INADDR_ANY, IN6ADDR_ANY_INIT
 #include <arpa/inet.h> // inet_pton

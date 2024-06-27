@@ -1,3 +1,5 @@
+#pragma once
+
 #define _GNU_SOURCE
 
 #include <pthread.h> // pthread_create, pthread_join
