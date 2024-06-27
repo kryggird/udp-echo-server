@@ -123,10 +123,22 @@ typedef struct sendmsg_metadata_t {
     struct msghdr msghdr;
 } sendmsg_metadata_t;
 
+struct io_uring_sqe* maybe_submit_and_get_sqe(struct io_uring* ring)  {
+    struct io_uring_sqe* sqe = io_uring_get_sqe(ring);
+    
+    if (!sqe) {
+	// Retry after clearing the submission ring
+	io_uring_submit(ring);
+	sqe = io_uring_get_sqe(ring);
+    }
+
+    return sqe;
+}
+
 // TODO bounds check
 int prep_sendmsg(struct io_uring* ring, sendmsg_metadata_t metadata_array[], recvmsg_result_t* res) {
     // TODO: flush submit ring if one cannot get an SQE?
-    struct io_uring_sqe* sqe = io_uring_get_sqe(ring);
+    struct io_uring_sqe* sqe = maybe_submit_and_get_sqe(ring);
 
     sendmsg_metadata_t* meta = &metadata_array[res->buffer_idx];
     meta->iov = (struct iovec) {

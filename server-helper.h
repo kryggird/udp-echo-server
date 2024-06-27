@@ -46,8 +46,6 @@ void run_server(void) {
 
 	size_t new_cqe_count = io_uring_peek_batch_cqe(&ring, cqe_slots, NUM_CQE_SLOTS);
 
-	printf("CQE count: %zu\n", new_cqe_count);
-
 	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
 	    // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
 	    
