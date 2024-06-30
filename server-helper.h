@@ -38,7 +38,10 @@ void run_server(void) {
     };
     prep_recv_multishot(&ring, &msg);
     io_uring_submit(&ring);
-    
+
+    size_t recv_count = 0;
+    size_t send_count = 0;
+
     for (;;) {
 	int ret = io_uring_submit_and_wait(&ring, 1);
 	if (ret == -EINTR) { continue; }
@@ -56,6 +59,9 @@ void run_server(void) {
 	    }
 	}
 
+	size_t old_recv_count = recv_count;
+	size_t buf_ring_advance = 0;
+
 	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
 	    // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
 	    
@@ -63,18 +69,33 @@ void run_server(void) {
 	
 	    if (op_meta.is_recvmsg) {
 		recvmsg_result_t res = validate_recvmsg(cqe_slots[cqe_idx], &pool, &msg);
+		++recv_count;
 
 		if (res.is_valid) {
 		    prep_sendmsg(&ring, sendmsg_slots, &res);
+		    ++send_count;
+		} else {
+		    add_buffer(&pool, op_meta.buffer_idx);
+		    ++buf_ring_advance;
 		}
 
 	    } else {
 		add_buffer(&pool, op_meta.buffer_idx);
-		io_uring_buf_ring_advance(pool.metadata, 1);
+		++buf_ring_advance;
 	    }
+	}
+	
+	io_uring_buf_ring_advance(pool.metadata, buf_ring_advance);
 
+	if ((recv_count / (32 * 1024)) > (old_recv_count / (32 * 1024))) {
+	    printf("Recv (k): %5zu, Sent (k): %5zu, Invalid: %7zu, Overflow: %5u\n", 
+		    recv_count / 1000, send_count / 1000, (recv_count - send_count), *ring.cq.koverflow);
 	}
 	
 	io_uring_cq_advance(&ring, new_cqe_count);
     }
+
+    // Cleanup
+    io_uring_queue_exit(&ring);
+    close(fd);
 }

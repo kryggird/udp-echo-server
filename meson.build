@@ -4,6 +4,6 @@ liburing_dep = dependency('liburing')
 
 executable('udp-echo-server',
            'main.c',
-           c_args: ['-march=skylake'],
+           c_args: ['-march=skylake', '-g'],
            dependencies: [liburing_dep],
            )

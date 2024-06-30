@@ -35,6 +35,8 @@ void* run_one(void* arg) {
         return NULL;
     }
 
+    printf("Running on logical core %d\n", args->thread_id);
+
     run_server(/*args->params*/);
     return NULL;
 }
@@ -57,8 +59,8 @@ void run_many(struct parameters* params) {
     for (int cpu_idx = 0; cpu_idx < sysconf(_SC_NPROCESSORS_ONLN); cpu_idx++) {
         if (CPU_ISSET(cpu_idx, &cpu_mask)) {
             args[thread_idx] = (thread_args){
-          .thread_id = cpu_idx,
-          .params = params
+                .thread_id = cpu_idx,
+                .params = params
             };
             if (pthread_create(&threads[thread_idx], NULL, run_one, &args[thread_idx])!= 0) {
                 perror("pthread_create");

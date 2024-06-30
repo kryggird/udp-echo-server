@@ -104,7 +104,6 @@ recvmsg_result_t validate_recvmsg(struct io_uring_cqe* cqe, buffer_pool_t* pool,
     struct io_uring_recvmsg_out* slot = io_uring_recvmsg_validate(buffer_pointer(pool, idx), cqe->res, msg);
 
     if (!slot || slot->namelen > msg->msg_namelen || slot->flags & MSG_TRUNC) {
-	// recycle_buffer(ctx, idx);
 	return (recvmsg_result_t){0};
     }
 
@@ -156,7 +155,7 @@ int prep_sendmsg(struct io_uring* ring, sendmsg_metadata_t metadata_array[], rec
 
     op_metadata_t op_meta = {.buffer_idx = (uint32_t) res->buffer_idx, .is_recvmsg = 0};
 
-    io_uring_prep_sendmsg(sqe, 0 /* registered socket idx */, &(meta->msghdr), 0);
+    io_uring_prep_sendmsg_zc(sqe, 0 /* registered socket idx */, &(meta->msghdr), 0);
     io_uring_sqe_set_data64(sqe, op_meta.as_u64);
     sqe->flags |= IOSQE_FIXED_FILE; // TODO fold into flags argument of prep_sendmsg?
 
