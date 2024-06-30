@@ -35,7 +35,9 @@ buffer_pool_t init_buffer_pool(size_t buf_size, size_t num_buffers) {
     size_t mmap_size = (buf_size + sizeof(struct io_uring_buf)) * num_buffers;
 
     void* metadata = mmap(NULL, mmap_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, 0, 0);
-    // TODO check for error
+    if (metadata == NULL) {
+	return (buffer_pool_t){0, buf_size, 0, NULL, NULL};
+    }
     void* buffers = metadata + sizeof(struct io_uring_buf) * num_buffers;
 
     return (buffer_pool_t){num_buffers, buf_size, mmap_size, metadata, buffers};
@@ -136,9 +138,7 @@ struct io_uring_sqe* maybe_submit_and_get_sqe(struct io_uring* ring)  {
     return sqe;
 }
 
-// TODO bounds check
 int prep_sendmsg(struct io_uring* ring, sendmsg_metadata_t metadata_array[], recvmsg_result_t* res) {
-    // TODO: flush submit ring if one cannot get an SQE?
     struct io_uring_sqe* sqe = maybe_submit_and_get_sqe(ring);
 
     sendmsg_metadata_t* meta = &metadata_array[res->buffer_idx];

@@ -11,6 +11,9 @@
     if ((cond)) { perror((err_str)); return -1; }
 
 int init_socket(bool is_ip_v4, uint32_t port) {
+    if (port == 0) {
+        return -1; // User must provide a valid port
+    }
     uint16_t port_be = htons(port); // Handle zero?
 
     int fd = socket(is_ip_v4? AF_INET : AF_INET6, SOCK_DGRAM, 0);
@@ -56,8 +59,6 @@ int init_socket(bool is_ip_v4, uint32_t port) {
 
     ret = bind(fd, addr, addr_len);
     HANDLE_ERROR(ret < 0, "bind");
-
-    // TODO check that port is bound
 
     return fd;
 }

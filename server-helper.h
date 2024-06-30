@@ -3,6 +3,9 @@
 #define _GNU_SOURCE
 
 #include <stdint.h>
+#include <stdio.h>  // printf
+#include <string.h> // strerror
+
 
 #include <sys/stat.h>
 #include <sys/socket.h>
@@ -17,9 +20,6 @@ const size_t NUM_BUFFERS = 1024;
 
 const int IO_QUEUE_DEPTH = 64;
 const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
-
-#include <stdio.h>
-
 void run_server(bool is_ip_v4, uint32_t port) {
     int fd = init_socket(is_ip_v4, port);
     
@@ -36,7 +36,11 @@ void run_server(bool is_ip_v4, uint32_t port) {
     if (pool.metadata == NULL) { // Allocation failure
 	goto ring_cleanup;
     }
-    io_uring_register_files(&ring, &fd, 1); // TODO get registered file idx
+    ret = io_uring_register_files(&ring, &fd, 1); // TODO get registered file idx
+    if(ret) {
+        fprintf(stderr, "error registering buffers: %s", strerror(-ret));
+	goto pool_cleanup;
+    }
 
     struct msghdr msg = (struct msghdr){
 	.msg_namelen = sizeof(struct sockaddr_storage), // TODO Why not 0?
