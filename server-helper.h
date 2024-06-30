@@ -20,8 +20,8 @@ const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
 
 #include <stdio.h>
 
-void run_server(void) {
-    int fd = init_socket_v6(8080);
+void run_server(bool is_ip_v4, uint32_t port) {
+    int fd = init_socket(is_ip_v4, port);
     
     buffer_pool_t pool = init_buffer_pool(BUFFER_SIZE, NUM_BUFFERS);
     struct io_uring_cqe* cqe_slots[NUM_CQE_SLOTS];

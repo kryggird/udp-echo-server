@@ -4,6 +4,7 @@
 
 #include <pthread.h> // pthread_create, pthread_join
 #include <sched.h> // sched_setaffinity, CPU_SETSIZE, CPU_ZERO, CPU_SET, sched_getaffinity
+#include <stdbool.h>
 #include <stddef.h> // NULL
 #include <stdio.h> // perror
 #include <unistd.h>
@@ -11,7 +12,8 @@
 
 typedef struct {
     int thread_id;
-    struct parameters* params;
+    uint32_t port;
+    bool ip_v4;
 } thread_args;
 
 int count_cpus(cpu_set_t* cpu_mask) {
@@ -37,11 +39,11 @@ void* run_one(void* arg) {
 
     printf("Running on logical core %d\n", args->thread_id);
 
-    run_server(/*args->params*/);
+    run_server(args->ip_v4, args->port);
     return NULL;
 }
 
-void run_many(struct parameters* params) {
+void run_many(bool ip_v4, uint32_t port) {
     cpu_set_t cpu_mask;
     int num_active_cpus;
 
@@ -60,7 +62,8 @@ void run_many(struct parameters* params) {
         if (CPU_ISSET(cpu_idx, &cpu_mask)) {
             args[thread_idx] = (thread_args){
                 .thread_id = cpu_idx,
-                .params = params
+                .ip_v4 = ip_v4,
+                .port = port
             };
             if (pthread_create(&threads[thread_idx], NULL, run_one, &args[thread_idx])!= 0) {
                 perror("pthread_create");
