@@ -4,14 +4,15 @@
 
 #include "liburing.h"
 
-void init_ring(struct io_uring* ring, unsigned int queue_depth) {
-    // TODO error checking
+int init_ring(struct io_uring* ring, unsigned int queue_depth) {
     int ret = io_uring_queue_init_params(queue_depth, ring, &(struct io_uring_params) {
 	.cq_entries = queue_depth * 8u,
 	.flags = IORING_SETUP_SUBMIT_ALL 
 	| IORING_SETUP_COOP_TASKRUN 
 	| IORING_SETUP_CQSIZE    
     });
+
+    return ret;
 }
 
 typedef union op_metadata_t {
@@ -40,6 +41,12 @@ buffer_pool_t init_buffer_pool(size_t buf_size, size_t num_buffers) {
     return (buffer_pool_t){num_buffers, buf_size, mmap_size, metadata, buffers};
 }
 
+void unmap_pool(buffer_pool_t* pool) {
+    munmap(pool->metadata, pool->size);
+    pool->metadata = NULL;
+    pool->size = 0;
+}
+
 unsigned char* buffer_pointer(buffer_pool_t* pool, size_t idx) {
     return pool->buffers + idx * pool->buf_size;
 }
@@ -63,11 +70,6 @@ void register_buffer_pool(struct io_uring* ring, buffer_pool_t* pool) {
 
     int ret = io_uring_register_buf_ring(ring, &reg, 0);
     for (size_t idx = 0; idx < pool->num_buffers; ++idx) {
-	// io_uring_buf_ring_add(pool->metadata, 
-	// 		      buffer_pointer(pool, idx),
-	// 		      pool->buf_size, idx,
-	// 		      io_uring_buf_ring_mask(pool->num_buffers), 
-	// 		      idx);
 	add_buffer(pool, idx);
     }
     io_uring_buf_ring_advance(pool->metadata, pool->num_buffers);

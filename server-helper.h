@@ -28,8 +28,14 @@ void run_server(bool is_ip_v4, uint32_t port) {
     sendmsg_metadata_t sendmsg_slots[NUM_CQE_SLOTS];
 
     struct io_uring ring;
-    init_ring(&ring, IO_QUEUE_DEPTH);
+    int ret = init_ring(&ring, IO_QUEUE_DEPTH);
+    if (ret != 0) { 
+	goto socket_cleanup; 
+    }
     register_buffer_pool(&ring, &pool);
+    if (pool.metadata == NULL) { // Allocation failure
+	goto ring_cleanup;
+    }
     io_uring_register_files(&ring, &fd, 1); // TODO get registered file idx
 
     struct msghdr msg = (struct msghdr){
@@ -95,7 +101,10 @@ void run_server(bool is_ip_v4, uint32_t port) {
 	io_uring_cq_advance(&ring, new_cqe_count);
     }
 
-    // Cleanup
+pool_cleanup:
+    unmap_pool(&pool);
+ring_cleanup:
     io_uring_queue_exit(&ring);
+socket_cleanup:
     close(fd);
 }

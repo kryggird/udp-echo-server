@@ -12,7 +12,6 @@ const bool DEFAULT_SINGLE_THREADED = false;
 const bool DEFAULT_IP_V4 = false;
 
 typedef struct options_t {
-    char *address;
     uint32_t port;
     bool send_zc;
     bool single_threaded;
@@ -38,7 +37,6 @@ static void print_usage(const char *program_name) {
 
 int main(int argc, char *argv[]) {
     options_t opts = {
-       .address = NULL,
        .port = DEFAULT_PORT,
        .send_zc = DEFAULT_SEND_ZC,
        .single_threaded = DEFAULT_SINGLE_THREADED,
@@ -46,11 +44,8 @@ int main(int argc, char *argv[]) {
     };
 
     int c;
-    while ((c = getopt_long_only(argc, argv, "", long_options, NULL))!= -1) {
+    while ((c = getopt_long_only(argc, argv, "", long_options, NULL)) != -1) {
         switch (c) {
-            case 'a':
-                opts.address = optarg;
-                break;
             case 'p':
                 opts.port = strtoul(optarg, NULL, 10);
                 break;
@@ -68,15 +63,10 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    if (opts.address == NULL) {
-        fprintf(stderr, "Error: address is required\n");
-        print_usage(argv[0]);
-    }
-
-    printf("Address: %s\n", opts.address);
     printf("Port: %u\n", opts.port);
-    printf("Send ZC: %s\n", opts.send_zc? "true" : "false");
-    printf("Single-threaded: %s\n", opts.single_threaded? "true" : "false");
+    printf("Send ZC: %s\n", opts.send_zc ? "true" : "false");
+    printf("Single-threaded: %s\n", opts.single_threaded ? "true" : "false");
+    printf("IP type: %s\n", opts.ip_v4 ? "v4" : "v6");
 
 	if (opts.single_threaded) {
 		run_server(opts.ip_v4, opts.port);
