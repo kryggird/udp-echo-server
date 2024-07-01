@@ -4,10 +4,10 @@
 
 #include "liburing.h"
 
-int init_ring(struct io_uring* ring, unsigned int queue_depth) {
+int init_ring(struct io_uring* ring, unsigned int queue_depth, unsigned int cq_entries) {
     int ret = io_uring_queue_init_params(
         queue_depth, ring,
-        &(struct io_uring_params){.cq_entries = queue_depth * 8u,
+        &(struct io_uring_params){.cq_entries = cq_entries,
                                   .flags = IORING_SETUP_SUBMIT_ALL |
                                            IORING_SETUP_COOP_TASKRUN |
                                            IORING_SETUP_CQSIZE |
