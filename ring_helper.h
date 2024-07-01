@@ -10,7 +10,8 @@ int init_ring(struct io_uring* ring, unsigned int queue_depth) {
         &(struct io_uring_params){.cq_entries = queue_depth * 8u,
                                   .flags = IORING_SETUP_SUBMIT_ALL |
                                            IORING_SETUP_COOP_TASKRUN |
-                                           IORING_SETUP_CQSIZE});
+                                           IORING_SETUP_CQSIZE |
+                                           IORING_SETUP_SINGLE_ISSUER});
 
     return ret;
 }
