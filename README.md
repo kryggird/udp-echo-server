@@ -9,6 +9,9 @@ and the multishot recv functionaly of `io_uring` is used.
 The server can optionally send responses using the new zero-copy functionality
 of the Linux kernel with the flag `--send_zc`.
 
+Note that, due to the use of certain `io_uring` features, the server needs
+to run on Linux 6.0 or later.
+
 ## Build instructions
 
 This server depends on `liburing` and `pthreads`. Meson's wraptool can be used
