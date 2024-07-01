@@ -37,7 +37,7 @@ static void print_usage(const char* program_name) {
         stderr,
         "  --single-threaded      Run in single-threaded mode (default: %s)\n",
         DEFAULT_SINGLE_THREADED ? "true" : "false");
-    fprintf(stderr, "  --ipv4                 Use IPv4 (default: false)\n");
+    fprintf(stderr, "  --ipv4                 Use IPv4 only (default: false)\n");
     fprintf(stderr, "  --print-stats          Periodically print packet counts\n");
     exit(EXIT_FAILURE);
 }
@@ -64,6 +64,9 @@ int main(int argc, char* argv[]) {
             case 'S':
                 opts.print_stats = true;
                 break;
+            case 'i':
+                opts.ip_v4 = true;
+                break;
             case '?':
                 print_usage(argv[0]);
                 break;
@@ -75,7 +78,7 @@ int main(int argc, char* argv[]) {
     printf("Port: %u\n", opts.port);
     printf("Send ZC: %s\n", opts.send_zc ? "true" : "false");
     printf("Single-threaded: %s\n", opts.single_threaded ? "true" : "false");
-    printf("IP type: %s\n", opts.ip_v4 ? "v4" : "v6");
+    printf("IP type: %s\n", opts.ip_v4 ? "v4 only" : "v6");
 
     if (opts.single_threaded) {
         run_server(opts.ip_v4, opts.port, NULL);

@@ -6,8 +6,11 @@ from subprocess import DEVNULL
 import socket
 from time import sleep
 import os
+import sys
 
 TEST_BYTESTRING = b"Hello World!"
+ADDRESS_V4 = '0.0.0.0'
+ADDRESS_V6 = '::1'
 
 @contextlib.contextmanager
 def kill_on_exit(process):
@@ -19,13 +22,19 @@ def kill_on_exit(process):
 if __name__ == "__main__":
     cmd = ['builddir/udp-echo-server', '--port', '9999']
 
+    address = ADDRESS_V4
+    kind = socket.AF_INET
+    if (len(sys.argv) >= 2 and sys.argv[1] == '--v6'):
+        kind = socket.AF_INET6
+        address = ADDRESS_V6
+
     result = 1
     with kill_on_exit(subprocess.Popen(cmd, stdout=DEVNULL)) as p:
         sleep(1) # Hacky...
 
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock = socket.socket(kind, socket.SOCK_DGRAM)
         sock.settimeout(3)
-        sock.sendto(TEST_BYTESTRING, ('0.0.0.0', 9999))
+        sock.sendto(TEST_BYTESTRING, (address, 9999))
 
         response, addr = sock.recvfrom(1024)
 
