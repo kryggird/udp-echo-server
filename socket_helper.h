@@ -32,7 +32,7 @@ int init_socket(bool is_ip_v4, uint32_t port) {
         addr_v4 = (struct sockaddr_in) {
             .sin_family = AF_INET,
             .sin_port = port_be,
-            .sin_addr = INADDR_ANY
+            .sin_addr = {INADDR_ANY}
         };
         addr = (struct sockaddr*)&addr_v4;
         addr_len = sizeof(addr_v4);

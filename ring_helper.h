@@ -60,7 +60,7 @@ void add_buffer(buffer_pool_t* pool, size_t idx) {
                           io_uring_buf_ring_mask(pool->num_buffers), idx);
 }
 
-void register_buffer_pool(struct io_uring* ring, buffer_pool_t* pool) {
+int register_buffer_pool(struct io_uring* ring, buffer_pool_t* pool) {
     io_uring_buf_ring_init(pool->metadata);
 
     struct io_uring_buf_reg reg =
@@ -69,17 +69,22 @@ void register_buffer_pool(struct io_uring* ring, buffer_pool_t* pool) {
                                   .bgid = 0};
 
     int ret = io_uring_register_buf_ring(ring, &reg, 0);
+    if (ret < 0) {
+        return ret;
+    }
+
     for (size_t idx = 0; idx < pool->num_buffers; ++idx) {
         add_buffer(pool, idx);
     }
     io_uring_buf_ring_advance(pool->metadata, pool->num_buffers);
+
+    return 0;
 }
 
-int prep_recv_multishot(struct io_uring* ring, struct msghdr* msg) {
+int prep_recv_multishot(struct io_uring* ring, struct msghdr* msg, int fd_index) {
     struct io_uring_sqe* sqe = io_uring_get_sqe(ring);
 
-    io_uring_prep_recvmsg_multishot(
-        sqe, 0 /* First registered fd. TODO: thread index */, msg, MSG_TRUNC);
+    io_uring_prep_recvmsg_multishot(sqe, fd_index, msg, MSG_TRUNC);
     sqe->flags |= IOSQE_FIXED_FILE | IOSQE_BUFFER_SELECT;
     sqe->buf_group = 0;
 
@@ -138,7 +143,8 @@ struct io_uring_sqe* maybe_submit_and_get_sqe(struct io_uring* ring) {
 
 int prep_sendmsg(struct io_uring* ring,
                  sendmsg_metadata_t metadata_array[],
-                 recvmsg_result_t* res) {
+                 recvmsg_result_t* res,
+                 int fd_index) {
     struct io_uring_sqe* sqe = maybe_submit_and_get_sqe(ring);
 
     sendmsg_metadata_t* meta = &metadata_array[res->buffer_idx];
@@ -156,11 +162,10 @@ int prep_sendmsg(struct io_uring* ring,
     op_metadata_t op_meta = {.buffer_idx = (uint32_t)res->buffer_idx,
                              .is_recvmsg = 0};
 
-    io_uring_prep_sendmsg_zc(sqe, 0 /* registered socket idx */,
+    io_uring_prep_sendmsg_zc(sqe, fd_index,
                              &(meta->msghdr), 0);
     io_uring_sqe_set_data64(sqe, op_meta.as_u64);
-    sqe->flags |=
-        IOSQE_FIXED_FILE;  // TODO fold into flags argument of prep_sendmsg?
+    sqe->flags |= IOSQE_FIXED_FILE;
 
     return 0;
 }

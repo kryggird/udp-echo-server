@@ -30,20 +30,21 @@ void run_server(bool is_ip_v4, uint32_t port) {
     if (ret != 0) {
         goto socket_cleanup;
     }
-    register_buffer_pool(&ring, &pool);
-    if (pool.metadata == NULL) {  // Allocation failure
+    ret = register_buffer_pool(&ring, &pool);
+    if ((ret != 0) || pool.metadata == NULL) {  // Allocation failure
         goto ring_cleanup;
     }
     ret = io_uring_register_files(&ring, &fd, 1);
+    int fd_index = 0; // We register only one socket!
     if (ret) {
         fprintf(stderr, "error registering buffers: %s", strerror(-ret));
         goto pool_cleanup;
     }
 
     struct msghdr msg = (struct msghdr){
-        .msg_namelen = sizeof(struct sockaddr_storage),  // TODO Why not 0?
+        .msg_namelen = sizeof(struct sockaddr_storage),
         .msg_controllen = 0};
-    prep_recv_multishot(&ring, &msg);
+    prep_recv_multishot(&ring, &msg, fd_index);
     io_uring_submit(&ring);
 
     size_t recv_count = 0;
@@ -66,7 +67,7 @@ void run_server(bool is_ip_v4, uint32_t port) {
             int must_rearm = !(cqe_slots[cqe_idx]->flags & IORING_CQE_F_MORE);
 
             if (op_meta.is_recvmsg && must_rearm) {
-                prep_recv_multishot(&ring, &msg);
+                prep_recv_multishot(&ring, &msg, fd_index);
                 io_uring_submit(&ring);
                 break;
             }
@@ -86,7 +87,7 @@ void run_server(bool is_ip_v4, uint32_t port) {
                 ++recv_count;
 
                 if (res.is_valid) {
-                    prep_sendmsg(&ring, sendmsg_slots, &res);
+                    prep_sendmsg(&ring, sendmsg_slots, &res, fd_index);
                     ++send_count;
                 } else {
                     add_buffer(&pool, op_meta.buffer_idx);
