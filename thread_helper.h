@@ -17,6 +17,7 @@ typedef struct {
     int thread_id;
     uint32_t port;
     bool ip_v4;
+    bool send_zc;
     atomic_stats_t* stats;
 } thread_args;
 
@@ -77,11 +78,11 @@ void* run_one(void* arg) {
 
     printf("Running on logical core %d\n", args->thread_id);
 
-    run_server(args->ip_v4, args->port, args->stats);
+    run_server(args->ip_v4, args->port, args->send_zc, args->stats);
     return NULL;
 }
 
-void run_many(bool ip_v4, uint32_t port, bool print_stats) {
+void run_many(bool ip_v4, uint32_t port, bool send_zc, bool print_stats) {
     cpu_set_t cpu_mask;
     int num_active_cpus;
 
@@ -105,7 +106,11 @@ void run_many(bool ip_v4, uint32_t port, bool print_stats) {
             }
 
             args[thread_idx] = (thread_args){
-                .thread_id = cpu_idx, .ip_v4 = ip_v4, .port = port, .stats = stats_ptr,
+                .thread_id = cpu_idx, 
+                .ip_v4 = ip_v4, 
+                .port = port, 
+                .send_zc = send_zc, 
+                .stats = stats_ptr,
             };
             if (pthread_create(&threads[thread_idx], NULL, run_one,
                                &args[thread_idx]) != 0) {

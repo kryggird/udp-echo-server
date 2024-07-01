@@ -81,9 +81,9 @@ int main(int argc, char* argv[]) {
     printf("IP type: %s\n", opts.ip_v4 ? "v4 only" : "v6");
 
     if (opts.single_threaded) {
-        run_server(opts.ip_v4, opts.port, NULL);
+        run_server(opts.ip_v4, opts.port, opts.send_zc, NULL);
     } else {
-        run_many(opts.ip_v4, opts.port, opts.print_stats);
+        run_many(opts.ip_v4, opts.port, opts.send_zc, opts.print_stats);
     }
 
     return 0;

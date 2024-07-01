@@ -145,6 +145,7 @@ struct io_uring_sqe* maybe_submit_and_get_sqe(struct io_uring* ring) {
 int prep_sendmsg(struct io_uring* ring,
                  sendmsg_metadata_t metadata_array[],
                  recvmsg_result_t* res,
+                 bool is_zc,
                  int fd_index) {
     struct io_uring_sqe* sqe = maybe_submit_and_get_sqe(ring);
 
@@ -163,8 +164,11 @@ int prep_sendmsg(struct io_uring* ring,
     op_metadata_t op_meta = {.buffer_idx = (uint32_t)res->buffer_idx,
                              .is_recvmsg = 0};
 
-    io_uring_prep_sendmsg_zc(sqe, fd_index,
-                             &(meta->msghdr), 0);
+    if (is_zc) {
+        io_uring_prep_sendmsg_zc(sqe, fd_index, &(meta->msghdr), 0);
+    } else {
+        io_uring_prep_sendmsg(sqe, fd_index, &(meta->msghdr), 0);
+    }
     io_uring_sqe_set_data64(sqe, op_meta.as_u64);
     sqe->flags |= IOSQE_FIXED_FILE;
 

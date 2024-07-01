@@ -19,7 +19,7 @@ const size_t NUM_BUFFERS = 1024;
 const int IO_QUEUE_DEPTH = 64;
 const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
 
-void run_server(bool is_ip_v4, uint32_t port, atomic_stats_t* stats) {
+void run_server(bool is_ip_v4, uint32_t port, bool send_zc, atomic_stats_t* stats) {
     int fd = init_socket(is_ip_v4, port);
 
     buffer_pool_t pool = init_buffer_pool(BUFFER_SIZE, NUM_BUFFERS);
@@ -27,7 +27,7 @@ void run_server(bool is_ip_v4, uint32_t port, atomic_stats_t* stats) {
     sendmsg_metadata_t sendmsg_slots[NUM_CQE_SLOTS];
 
     struct io_uring ring;
-    int ret = init_ring(&ring, IO_QUEUE_DEPTH);
+    int ret = init_ring(&ring, IO_QUEUE_DEPTH, NUM_CQE_SLOTS);
     if (ret != 0) {
         goto socket_cleanup;
     }
@@ -86,7 +86,7 @@ void run_server(bool is_ip_v4, uint32_t port, atomic_stats_t* stats) {
                 ++recv_count;
 
                 if (res.is_valid) {
-                    prep_sendmsg(&ring, sendmsg_slots, &res, fd_index);
+                    prep_sendmsg(&ring, sendmsg_slots, &res, send_zc, fd_index);
                     ++send_count;
                 } else {
                     add_buffer(&pool, op_meta.buffer_idx);
