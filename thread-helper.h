@@ -2,13 +2,14 @@
 
 #define _GNU_SOURCE
 
-#include <pthread.h> // pthread_create, pthread_join
-#include <sched.h> // sched_setaffinity, CPU_SETSIZE, CPU_ZERO, CPU_SET, sched_getaffinity
+#include <pthread.h>  // pthread_create, pthread_join
+#include <sched.h>  // sched_setaffinity, CPU_SETSIZE, CPU_ZERO, CPU_SET, sched_getaffinity
 #include <stdbool.h>
-#include <stddef.h> // NULL
-#include <stdio.h> // perror
+#include <stddef.h>  // NULL
+#include <stdio.h>   // perror
 #include <unistd.h>
-#include "server-helper.h" // run_server
+
+#include "server-helper.h"  // run_server
 
 typedef struct {
     int thread_id;
@@ -27,12 +28,12 @@ int count_cpus(cpu_set_t* cpu_mask) {
 }
 
 void* run_one(void* arg) {
-    thread_args* args = (thread_args*) arg;
+    thread_args* args = (thread_args*)arg;
     cpu_set_t cpu_set;
 
     CPU_ZERO(&cpu_set);
     CPU_SET(args->thread_id, &cpu_set);
-    if (sched_setaffinity(0, sizeof(cpu_set), &cpu_set)!= 0) {
+    if (sched_setaffinity(0, sizeof(cpu_set), &cpu_set) != 0) {
         perror("sched_setaffinity");
         return NULL;
     }
@@ -47,7 +48,7 @@ void run_many(bool ip_v4, uint32_t port) {
     cpu_set_t cpu_mask;
     int num_active_cpus;
 
-    if (sched_getaffinity(0, sizeof(cpu_mask), &cpu_mask)!= 0) {
+    if (sched_getaffinity(0, sizeof(cpu_mask), &cpu_mask) != 0) {
         perror("sched_getaffinity");
         return;
     }
@@ -61,11 +62,9 @@ void run_many(bool ip_v4, uint32_t port) {
     for (int cpu_idx = 0; cpu_idx < sysconf(_SC_NPROCESSORS_ONLN); cpu_idx++) {
         if (CPU_ISSET(cpu_idx, &cpu_mask)) {
             args[thread_idx] = (thread_args){
-                .thread_id = cpu_idx,
-                .ip_v4 = ip_v4,
-                .port = port
-            };
-            if (pthread_create(&threads[thread_idx], NULL, run_one, &args[thread_idx])!= 0) {
+                .thread_id = cpu_idx, .ip_v4 = ip_v4, .port = port};
+            if (pthread_create(&threads[thread_idx], NULL, run_one,
+                               &args[thread_idx]) != 0) {
                 perror("pthread_create");
                 return;
             }
@@ -77,4 +76,3 @@ void run_many(bool ip_v4, uint32_t port) {
         pthread_join(threads[thread_idx], NULL);
     }
 }
-

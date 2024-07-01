@@ -3,49 +3,46 @@
 #define _GNU_SOURCE
 
 #include <stdint.h>
-#include <stdio.h>  // printf
-#include <string.h> // strerror
-
-
-#include <sys/stat.h>
+#include <stdio.h>   // printf
+#include <string.h>  // strerror
 #include <sys/socket.h>
+#include <sys/stat.h>
 
 #include "liburing.h"
-#include "socket_helper.h"
 #include "ring_helper.h"
-
+#include "socket_helper.h"
 
 const size_t BUFFER_SIZE = 4096;
 const size_t NUM_BUFFERS = 1024;
 
 const int IO_QUEUE_DEPTH = 64;
 const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
+
 void run_server(bool is_ip_v4, uint32_t port) {
     int fd = init_socket(is_ip_v4, port);
-    
+
     buffer_pool_t pool = init_buffer_pool(BUFFER_SIZE, NUM_BUFFERS);
     struct io_uring_cqe* cqe_slots[NUM_CQE_SLOTS];
     sendmsg_metadata_t sendmsg_slots[NUM_CQE_SLOTS];
 
     struct io_uring ring;
     int ret = init_ring(&ring, IO_QUEUE_DEPTH);
-    if (ret != 0) { 
-	goto socket_cleanup; 
+    if (ret != 0) {
+        goto socket_cleanup;
     }
     register_buffer_pool(&ring, &pool);
-    if (pool.metadata == NULL) { // Allocation failure
-	goto ring_cleanup;
+    if (pool.metadata == NULL) {  // Allocation failure
+        goto ring_cleanup;
     }
-    ret = io_uring_register_files(&ring, &fd, 1); // TODO get registered file idx
-    if(ret) {
+    ret = io_uring_register_files(&ring, &fd, 1);
+    if (ret) {
         fprintf(stderr, "error registering buffers: %s", strerror(-ret));
-	goto pool_cleanup;
+        goto pool_cleanup;
     }
 
     struct msghdr msg = (struct msghdr){
-	.msg_namelen = sizeof(struct sockaddr_storage), // TODO Why not 0?
-	.msg_controllen = 0
-    };
+        .msg_namelen = sizeof(struct sockaddr_storage),  // TODO Why not 0?
+        .msg_controllen = 0};
     prep_recv_multishot(&ring, &msg);
     io_uring_submit(&ring);
 
@@ -53,56 +50,66 @@ void run_server(bool is_ip_v4, uint32_t port) {
     size_t send_count = 0;
 
     for (;;) {
-	int ret = io_uring_submit_and_wait(&ring, 1);
-	if (ret == -EINTR) { continue; }
-	if (ret < 0) { break; }
+        int ret = io_uring_submit_and_wait(&ring, 1);
+        if (ret == -EINTR) {
+            continue;
+        }
+        if (ret < 0) {
+            break;
+        }
 
-	size_t new_cqe_count = io_uring_peek_batch_cqe(&ring, cqe_slots, NUM_CQE_SLOTS);
+        size_t new_cqe_count =
+            io_uring_peek_batch_cqe(&ring, cqe_slots, NUM_CQE_SLOTS);
 
-	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
-	    op_metadata_t op_meta = { .as_u64 = cqe_slots[cqe_idx]->user_data };
-	    int must_rearm = !(cqe_slots[cqe_idx]->flags & IORING_CQE_F_MORE);
-	    if (op_meta.is_recvmsg && must_rearm) {
-		prep_recv_multishot(&ring, &msg);
-		io_uring_submit(&ring);
-		break;
-	    }
-	}
+        for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
+            op_metadata_t op_meta = {.as_u64 = cqe_slots[cqe_idx]->user_data};
+            int must_rearm = !(cqe_slots[cqe_idx]->flags & IORING_CQE_F_MORE);
 
-	size_t old_recv_count = recv_count;
-	size_t buf_ring_advance = 0;
+            if (op_meta.is_recvmsg && must_rearm) {
+                prep_recv_multishot(&ring, &msg);
+                io_uring_submit(&ring);
+                break;
+            }
+        }
 
-	for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
-	    // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
-	    
-	    op_metadata_t op_meta = { .as_u64 = cqe_slots[cqe_idx]->user_data };
-	
-	    if (op_meta.is_recvmsg) {
-		recvmsg_result_t res = validate_recvmsg(cqe_slots[cqe_idx], &pool, &msg);
-		++recv_count;
+        size_t old_recv_count = recv_count;
+        size_t buf_ring_advance = 0;
 
-		if (res.is_valid) {
-		    prep_sendmsg(&ring, sendmsg_slots, &res);
-		    ++send_count;
-		} else {
-		    add_buffer(&pool, op_meta.buffer_idx);
-		    ++buf_ring_advance;
-		}
+        for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
+            // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
 
-	    } else {
-		add_buffer(&pool, op_meta.buffer_idx);
-		++buf_ring_advance;
-	    }
-	}
-	
-	io_uring_buf_ring_advance(pool.metadata, buf_ring_advance);
+            op_metadata_t op_meta = {.as_u64 = cqe_slots[cqe_idx]->user_data};
 
-	if ((recv_count / (32 * 1024)) > (old_recv_count / (32 * 1024))) {
-	    printf("Recv (k): %5zu, Sent (k): %5zu, Invalid: %7zu, Overflow: %5u\n", 
-		    recv_count / 1000, send_count / 1000, (recv_count - send_count), *ring.cq.koverflow);
-	}
-	
-	io_uring_cq_advance(&ring, new_cqe_count);
+            if (op_meta.is_recvmsg) {
+                recvmsg_result_t res =
+                    validate_recvmsg(cqe_slots[cqe_idx], &pool, &msg);
+                ++recv_count;
+
+                if (res.is_valid) {
+                    prep_sendmsg(&ring, sendmsg_slots, &res);
+                    ++send_count;
+                } else {
+                    add_buffer(&pool, op_meta.buffer_idx);
+                    ++buf_ring_advance;
+                }
+
+            } else {
+                add_buffer(&pool, op_meta.buffer_idx);
+                ++buf_ring_advance;
+            }
+        }
+
+        io_uring_buf_ring_advance(pool.metadata, buf_ring_advance);
+
+        if ((recv_count / (32 * 1024)) > (old_recv_count / (32 * 1024))) {
+            printf(
+                "Recv (k): %5zu, Sent (k): %5zu, Invalid: %7zu, Overflow: "
+                "%5u\n",
+                recv_count / 1000, send_count / 1000, (recv_count - send_count),
+                *ring.cq.koverflow);
+        }
+
+        io_uring_cq_advance(&ring, new_cqe_count);
     }
 
 pool_cleanup:
