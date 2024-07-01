@@ -1,5 +1,5 @@
-#include "server-helper.h"
-#include "thread-helper.h"
+#include "server_helper.h"
+#include "thread_helper.h"
 
 #include <getopt.h>
 #include <stdio.h>

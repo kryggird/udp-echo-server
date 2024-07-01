@@ -9,7 +9,7 @@
 #include <stdio.h>   // perror
 #include <unistd.h>
 
-#include "server-helper.h"  // run_server
+#include "server_helper.h"  // run_server
 
 typedef struct {
     int thread_id;
