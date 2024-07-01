@@ -11,6 +11,7 @@
 #include "liburing.h"
 #include "ring_helper.h"
 #include "socket_helper.h"
+#include "stats_helper.h"
 
 const size_t BUFFER_SIZE = 65535;
 const size_t NUM_BUFFERS = 1024;
@@ -18,7 +19,7 @@ const size_t NUM_BUFFERS = 1024;
 const int IO_QUEUE_DEPTH = 64;
 const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
 
-void run_server(bool is_ip_v4, uint32_t port) {
+void run_server(bool is_ip_v4, uint32_t port, atomic_stats_t* stats) {
     int fd = init_socket(is_ip_v4, port);
 
     buffer_pool_t pool = init_buffer_pool(BUFFER_SIZE, NUM_BUFFERS);
@@ -49,6 +50,7 @@ void run_server(bool is_ip_v4, uint32_t port) {
 
     size_t recv_count = 0;
     size_t send_count = 0;
+    size_t koverflow_count = 0;
 
     for (;;) {
         int ret = io_uring_submit_and_wait(&ring, 1);
@@ -73,12 +75,9 @@ void run_server(bool is_ip_v4, uint32_t port) {
             }
         }
 
-        size_t old_recv_count = recv_count;
         size_t buf_ring_advance = 0;
 
         for (size_t cqe_idx = 0; cqe_idx < new_cqe_count; ++cqe_idx) {
-            // TODO: Handle IORING_CQE_F_MORE and IORING_CQE_F_BUFFER
-
             op_metadata_t op_meta = {.as_u64 = cqe_slots[cqe_idx]->user_data};
 
             if (op_meta.is_recvmsg) {
@@ -102,12 +101,9 @@ void run_server(bool is_ip_v4, uint32_t port) {
 
         io_uring_buf_ring_advance(pool.metadata, buf_ring_advance);
 
-        if ((recv_count / (32 * 1024)) > (old_recv_count / (32 * 1024))) {
-            printf(
-                "Recv (k): %5zu, Sent (k): %5zu, Invalid: %7zu, Overflow: "
-                "%5u\n",
-                recv_count / 1000, send_count / 1000, (recv_count - send_count),
-                *ring.cq.koverflow);
+        if (stats) {
+            koverflow_count += *ring.cq.koverflow;
+            update_atomic_stats(stats, send_count, recv_count, koverflow_count);
         }
 
         io_uring_cq_advance(&ring, new_cqe_count);
