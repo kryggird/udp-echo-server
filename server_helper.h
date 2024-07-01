@@ -12,7 +12,7 @@
 #include "ring_helper.h"
 #include "socket_helper.h"
 
-const size_t BUFFER_SIZE = 4096;
+const size_t BUFFER_SIZE = 65535;
 const size_t NUM_BUFFERS = 1024;
 
 const int IO_QUEUE_DEPTH = 64;
