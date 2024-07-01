@@ -17,11 +17,7 @@ def kill_on_exit(process):
         process.kill()
 
 if __name__ == "__main__":
-    if shutil.which('valgrind'):
-        cmd = ['valgrind', 'builddir/udp-echo-server', '--port', '8080']
-    else:
-        print("valgrind not available")
-        cmd = ['builddir/udp-echo-server', '--port', '8080']
+    cmd = ['builddir/udp-echo-server', '--port', '9999']
 
     result = 1
     with kill_on_exit(subprocess.Popen(cmd, stdout=DEVNULL)) as p:
@@ -29,7 +25,7 @@ if __name__ == "__main__":
 
         sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         sock.settimeout(3)
-        sock.sendto(TEST_BYTESTRING, ('0.0.0.0', 8080))
+        sock.sendto(TEST_BYTESTRING, ('0.0.0.0', 9999))
 
         response, addr = sock.recvfrom(1024)
 
