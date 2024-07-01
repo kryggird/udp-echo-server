@@ -4,6 +4,7 @@
 
 #include <arpa/inet.h>   // inet_pton
 #include <fcntl.h>       // O_RDONLY
+#include <limits.h>
 #include <netinet/in.h>  // sockaddr_in, htons, INADDR_ANY, IN6ADDR_ANY_INIT
 #include <stdbool.h>     // bool
 #include <stdlib.h>      // strtol
@@ -17,7 +18,7 @@
         return -1;                  \
     }
 
-int64_t read_proc(const char* filepath) {
+int read_proc(const char* filepath) {
     int fd = open(filepath, O_RDONLY);
     if (fd == -1) {
         perror("open");
@@ -38,7 +39,7 @@ int64_t read_proc(const char* filepath) {
 
     char *endptr;
     long int value = strtol(buffer, &endptr, 10);
-    if (endptr == buffer) {
+    if (endptr == buffer || (value > (long int) INT_MAX)) {
         fprintf(stderr, "Invalid value in %s\n", filepath);
         close(fd);
         return -1;
