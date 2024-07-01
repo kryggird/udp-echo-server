@@ -5,6 +5,6 @@ thread_dep = dependency('threads')
 
 executable('udp-echo-server',
            'main.c',
-           c_args: ['-g'],
+           c_args: ['-g', '-Wall', '-Wextra'],
            dependencies: [liburing_dep, thread_dep],
            )
