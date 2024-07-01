@@ -3,16 +3,51 @@
 #define GNU_SOURCE
 
 #include <arpa/inet.h>   // inet_pton
+#include <fcntl.h>       // O_RDONLY
 #include <netinet/in.h>  // sockaddr_in, htons, INADDR_ANY, IN6ADDR_ANY_INIT
 #include <stdbool.h>     // bool
+#include <stdlib.h>      // strtol
 #include <stdio.h>       // perror
 #include <sys/socket.h>  // socket, bind, AF_INET, SOCK_DGRAM, SO_REUSEPORT
+#include <unistd.h>      // open, close
 
 #define HANDLE_ERROR(cond, err_str) \
     if ((cond)) {                   \
         perror((err_str));          \
         return -1;                  \
     }
+
+int64_t read_proc(const char* filepath) {
+    int fd = open(filepath, O_RDONLY);
+    if (fd == -1) {
+        perror("open");
+        return -1;
+    }
+
+    char buffer[1024] = {0};
+    ssize_t bytes_read = read(fd, buffer, sizeof(buffer) - 1ul);
+    if (bytes_read == -1) {
+        perror("read");
+        close(fd);
+        return -1;
+    } else if (bytes_read == 1024) {
+        // Number is too big
+        close(fd);
+        return -1;
+    }
+
+    char *endptr;
+    long int value = strtol(buffer, &endptr, 10);
+    if (endptr == buffer) {
+        fprintf(stderr, "Invalid value in %s\n", filepath);
+        close(fd);
+        return -1;
+    }
+
+    close(fd);
+    return value;
+}
+
 
 int init_socket(bool is_ip_v4, uint32_t port) {
     if (port == 0) {
@@ -54,15 +89,21 @@ int init_socket(bool is_ip_v4, uint32_t port) {
     int max_buf_size;
     socklen_t optlen = sizeof(max_buf_size);
 
-    ret = getsockopt(fd, SOL_SOCKET, SO_RCVBUF, &max_buf_size, &optlen);
-    HANDLE_ERROR(ret < 0, "getsockopt SO_RCVBUF");
-    ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &max_buf_size, optlen);
-    HANDLE_ERROR(ret < 0, "setsockopt SO_RCVBUF");
-
-    ret = getsockopt(fd, SOL_SOCKET, SO_SNDBUF, &max_buf_size, &optlen);
-    HANDLE_ERROR(ret < 0, "getsockopt SO_SNDBUF");
-    ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &max_buf_size, optlen);
-    HANDLE_ERROR(ret < 0, "setsockopt SO_SNDBUF");
+    // max_buf_size = read_proc("/proc/sys/net/core/rmem_max");
+    // if (max_buf_size > 0) {
+    //     ret = setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &max_buf_size, optlen);
+    //     HANDLE_ERROR(ret < 0, "setsockopt SO_RCVBUF");
+    // } else {
+    //     fprintf(stderr, "Couldn't increase rcvbuf\n");
+    // }
+    //
+    // max_buf_size = read_proc("/proc/sys/net/core/wmem_max");
+    // if (max_buf_size > 0) {
+    //     ret = setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &max_buf_size, optlen);
+    //     HANDLE_ERROR(ret < 0, "setsockopt SO_SNDBUF");
+    // } else {
+    //     fprintf(stderr, "Couldn't increase sndbuf\n");
+    // }
 
     ret = bind(fd, addr, addr_len);
     HANDLE_ERROR(ret < 0, "bind");
