@@ -29,9 +29,9 @@ typedef struct {
 
 int count_cpus(cpu_set_t* cpu_mask) {
     int num_cpus = 0;
-    for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); i++) {
+    for (int i = 0; i < sysconf(_SC_NPROCESSORS_ONLN); ++i) {
         if (CPU_ISSET(i, cpu_mask)) {
-            num_cpus++;
+            ++num_cpus;
         }
     }
     return num_cpus;
@@ -84,26 +84,27 @@ void* run_one(void* arg) {
 
 void run_many(bool ip_v4, uint32_t port, bool send_zc, bool print_stats) {
     cpu_set_t cpu_mask;
-    int num_active_cpus;
-
     if (sched_getaffinity(0, sizeof(cpu_mask), &cpu_mask) != 0) {
         perror("sched_getaffinity");
         return;
     }
 
-    num_active_cpus = count_cpus(&cpu_mask);
+    int max_active_cpus = sysconf(_SC_NPROCESSORS_ONLN);
+    int num_active_cpus = count_cpus(&cpu_mask);
 
     pthread_t threads[num_active_cpus];
     thread_args args[num_active_cpus];
     atomic_stats_t stats[num_active_cpus];
-    int thread_idx = 0;
 
-    for (int cpu_idx = 0; cpu_idx < sysconf(_SC_NPROCESSORS_ONLN); cpu_idx++) {
+    for (int idx = 0; idx < num_active_cpus; ++idx) {
+        init_atomic_stats(&stats[idx]);
+
+    }
+
+    int thread_idx = 0;
+    for (int cpu_idx = 0; cpu_idx < max_active_cpus; ++cpu_idx) {
         if (CPU_ISSET(cpu_idx, &cpu_mask)) {
             atomic_stats_t* stats_ptr = print_stats ? &stats[thread_idx] : NULL;
-            if (stats_ptr) {
-                init_atomic_stats(stats_ptr);
-            }
 
             args[thread_idx] = (thread_args){
                 .thread_id = cpu_idx, 
@@ -117,7 +118,7 @@ void run_many(bool ip_v4, uint32_t port, bool send_zc, bool print_stats) {
                 perror("pthread_create");
                 return;
             }
-            thread_idx++;
+            ++thread_idx;
         }
     }
 
@@ -134,7 +135,7 @@ void run_many(bool ip_v4, uint32_t port, bool send_zc, bool print_stats) {
         }
     }
 
-    for (int thread_idx = 0; thread_idx < num_active_cpus; thread_idx++) {
+    for (int thread_idx = 0; thread_idx < num_active_cpus; ++thread_idx) {
         pthread_join(threads[thread_idx], NULL);
     }
 
