@@ -25,17 +25,23 @@ int init_socket(bool is_ip_v4, uint32_t port) {
 
     struct sockaddr* addr;
     socklen_t addr_len;
-
+    
+    struct sockaddr_in addr_v4;
+    struct sockaddr_in6 addr_v6;
     if (is_ip_v4) {
-        struct sockaddr_in addr_v4 = {.sin_family = AF_INET,
-                                      .sin_port = port_be,
-                                      .sin_addr = {INADDR_ANY}};
+        addr_v4 = (struct sockaddr_in) {
+            .sin_family = AF_INET,
+            .sin_port = port_be,
+            .sin_addr = INADDR_ANY
+        };
         addr = (struct sockaddr*)&addr_v4;
         addr_len = sizeof(addr_v4);
     } else {
-        struct sockaddr_in6 addr_v6 = {.sin6_family = AF_INET6,
-                                       .sin6_port = port_be,
-                                       .sin6_addr = IN6ADDR_ANY_INIT};
+        addr_v6 = (struct sockaddr_in6) {
+            .sin6_family = AF_INET6,
+            .sin6_port = port_be,
+            .sin6_addr = IN6ADDR_ANY_INIT
+        };
         addr = (struct sockaddr*)&addr_v6;
         addr_len = sizeof(addr_v6);
     }
