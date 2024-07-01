@@ -16,8 +16,9 @@
 const size_t BUFFER_SIZE = 65535;
 const size_t NUM_BUFFERS = 1024;
 
-const int IO_QUEUE_DEPTH = 64;
-const int NUM_CQE_SLOTS = IO_QUEUE_DEPTH * 16;
+// Use a define to avoid creating VLAs
+#define IO_QUEUE_DEPTH 64
+#define NUM_CQE_SLOTS 1024 // IO_QUEUE_DEPTH * 16
 
 void run_server(bool is_ip_v4, uint32_t port, bool send_zc, atomic_stats_t* stats) {
     int fd = init_socket(is_ip_v4, port);
@@ -85,12 +86,17 @@ void run_server(bool is_ip_v4, uint32_t port, bool send_zc, atomic_stats_t* stat
                     validate_recvmsg(cqe_slots[cqe_idx], &pool, &msg);
                 ++recv_count;
 
-                if (res.is_valid) {
-                    prep_sendmsg(&ring, sendmsg_slots, &res, send_zc, fd_index);
+                bool is_valid_idx = res.buffer_idx < NUM_CQE_SLOTS;
+                if (res.is_valid && is_valid_idx) {
+                    sendmsg_metadata_t* meta = &sendmsg_slots[res.buffer_idx];
+                    prep_sendmsg(&ring, meta, &res, send_zc, fd_index);
                     ++send_count;
-                } else {
+                } else if (is_valid_idx) {
                     add_buffer(&pool, op_meta.buffer_idx);
                     ++buf_ring_advance;
+                } else {
+                    fprintf(stderr, "pool index out-of-bound");
+                    goto pool_cleanup;
                 }
 
             } else {
